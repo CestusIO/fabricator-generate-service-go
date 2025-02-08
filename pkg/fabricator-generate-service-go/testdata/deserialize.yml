@@ -1,19 +1,68 @@
 apiVersion: fabricator.cestus.io/v1alpha1
 kind: Config
 components:
-- name: "fabricator-generate-service-go"
-  generator: fabricator-generate-service-go
-  spec:
-    pinDependency: 
-#      "github.com/test":
-#        name: "github.com/test"
-#        version: "v1.0.0"
-    replaceDependency:
-#      "github.com/test":
-#        name: "github.com/test"
-#        with: "github.com/test@v1.2.4"
-    toolDependency:
-#        "github.com/test":
-#         name: "github.com/test"
-## Dependencies cannot contain values because tests would inject them into the go.mod and go.sum files as real dependencies
-
+  - name: "fabricator-generate-service-go"
+    generator: fabricator-generate-service-go
+    spec:
+      pinDependency:
+      #      "github.com/test":
+      #        name: "github.com/test"
+      #        version: "v1.0.0"
+      replaceDependency:
+      #      "github.com/test":
+      #        name: "github.com/test"
+      #        with: "github.com/test@v1.2.4"
+      toolDependency:
+      #        "github.com/test":
+      #         name: "github.com/test"
+      ## Dependencies cannot contain values because tests would inject them into the go.mod and go.sum files as real dependencies
+      serviceName: "wombat"
+      hasRelationalDatabase: true
+      commands:
+        - name: ls
+          flags:
+            - name: all
+              type: bool
+              default: false
+              usage: set to true
+      apis:
+        - kind: Admin
+          version: v1
+          goModule: example.com/api/wombat
+          serviceName: "wombat"
+          replaceDependency:
+            "example.com/api/wombat":
+              name: "example.com/api/wombat"
+              with: "../api/wombat"
+        - kind: Player
+          version: v1
+          goModule: example.com/api/wombat
+          serviceName: "wombat"
+          replaceDependency:
+            "example.com/api/wombat":
+              name: "example.com/api/wombat"
+              with: "../api/wombat"
+        - kind: Player
+          version: v2
+          goModule: example.com/api/wombat/v2
+          serviceName: "wombat"
+          replaceDependency:
+            "example.com/api/wombat/v2":
+              name: "example.com/api/wombat/v2"
+              with: "../api/wombat/v2"
+        - kind: Public
+          version: v1
+          goModule: example.com/api/wombat
+          serviceName: "wombat"
+          replaceDependency:
+            "example.com/api/wombat":
+              name: "example.com/api/wombat"
+              with: "../api/wombat"
+        - kind: S2S
+          version: v1
+          goModule: example.com/api/wombat
+          serviceName: "wombat"
+          replaceDependency:
+            "example.com/api/wombat":
+              name: "example.com/api/wombat"
+              with: "../api/wombat"

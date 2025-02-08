@@ -1,0 +1,13 @@
+
+syntax = "proto3";
+
+package wombat.v1;
+option go_package = "example.com/api/wombat/v1/go/wombat_v1_admin";
+
+import "v1_common.proto";
+
+// AdminWombat is a Admin Wombat
+service AdminWombat {
+     rpc Echo(EchoMessage) returns (EchoMessage);
+}
+

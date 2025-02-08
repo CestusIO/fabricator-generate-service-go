@@ -1,0 +1,20 @@
+!!if .PluginComponent.Spec.HasRelationalDatabase
+!!delimiters <<< >>>
+
+<<< CodeSectionFileHeader | ToYAMLComment >>>
+
+# region CODE_REGION(config)
+version: "2"
+sql:
+  - schema: "../../../data/migrations/sql"
+    queries: "../../../data/queries/sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "data"
+        out: "."
+        sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_prepared_queries: true
+        emit_interface: true
+# endregion

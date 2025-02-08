@@ -1,0 +1,40 @@
+{{ CodeSectionFileHeader | ToGoComment }}
+
+package app
+
+import (
+	"code.cestus.io/libs/flags/pkg/flags"
+)
+
+type Config struct {
+// region CODE_REGION(COMMON_CONFIG)
+	LogLevel         string
+	Debug            bool
+	ConfigFolder     string
+	RoutePathPrefix  string
+	ProfilingEnabled bool
+	MonitoringAPIPort string
+	PlayerAPIPort     string
+	S2SAPIPort        string
+	AdminAPIPort      string
+	PublicAPIPort     string
+// endregion
+}
+
+//RegisterConfig registgers a config with a flagset
+func RegisterConfig(flagset *flags.FlagSet) *Config {
+// region CODE_REGION(COMMON_REGISTER)
+	conf := Config{}
+	flagset.BoolVar(&conf.Debug, 0, "app.debug", "puts the application into debug mode")
+	flagset.StringVar(&conf.LogLevel, 0, "app.loglevel", "info", "Loglevel error, warn,info, debug1..10")
+	flagset.StringVar(&conf.ConfigFolder, 0, "app.configfolder", "/configs", "folder in which configs are mounted")
+	flagset.StringVar(&conf.RoutePathPrefix, 0, "app.routepathprefix", "/{routingID}/{envID}", "prefix used in a url.")
+	flagset.BoolVar(&conf.ProfilingEnabled, 0, "app.profilingenabled", "enables the profiler")
+	flagset.StringVar(&conf.MonitoringAPIPort, 0, "app.monitoringapiport", "8000", "port used")
+	flagset.StringVar(&conf.PlayerAPIPort, 0, "app.playerapiport", "8001", "port used")
+	flagset.StringVar(&conf.S2SAPIPort, 0, "app.s2sapiport", "8002", "port used")
+	flagset.StringVar(&conf.AdminAPIPort, 0, "app.adminapiport", "8003", "port used")
+	flagset.StringVar(&conf.PublicAPIPort, 0, "app.publicapiport", "8004", "port used")
+// endregion
+	return &conf
+}

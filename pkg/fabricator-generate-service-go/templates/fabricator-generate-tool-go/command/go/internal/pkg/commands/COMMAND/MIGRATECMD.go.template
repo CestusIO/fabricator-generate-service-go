@@ -1,0 +1,169 @@
+!!if .ExtInfo.IsMigrateCmd
+!!pathreplace COMMAND {{.Command.Name}}cmd
+!!filename cmd.go
+{{ CodeSectionFileHeader | ToGoComment }}
+package {{.Command.Name | ToGoPackageName}}cmd
+
+import (
+// region CODE_REGION(COMMON_IMPORTS)
+	"context"
+	"database/sql"
+	"errors"
+	"path/filepath"
+
+	"code.cestus.io/blaze/pkg/server"
+	"code.cestus.io/blaze/pkg/servicegroup"
+	"github.com/go-logr/logr"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/peterbourgon/ff/v4"
+	"github.com/pressly/goose/v3"
+	"github.com/pressly/goose/v3/database"
+	"github.com/pressly/goose/v3/lock"
+
+	migrate "{{.GoModule}}/data"
+	"{{.GoModule}}/internal/pkg/commands/{{.Command.Name | ToGoPackageName}}cfg"
+	"{{.GoModule}}/internal/pkg/data"
+//endregion
+
+)
+
+// region CODE_REGION(IMPLEMENT)
+type RunFunc func(ctx context.Context, args []string) error
+
+// New returns a  ff.Command for the version subcommand.
+func New(conf *{{.Command.Name | ToGoPackageName}}cfg.Config, run RunFunc) *ff.Command {
+	return &ff.Command{
+		Name:       "{{.Command.Name | ToLower}}",
+		Usage: "{{.PluginComponent.Spec.ToolName | ToLower}} {{.Command.Name | ToLower}} [flags] ",
+		ShortHelp:  "{{.Command.Name | ToLower}}",
+		Flags:    conf.FS,
+		Exec:       run,
+//endregion
+	}
+}
+
+
+// region CODE_REGION(COMMON_RUNFUNC)
+func ProvideRunFunc(
+	conf *{{.Command.Name | ToGoPackageName}}cfg.Config,
+	log logr.Logger,
+	ctx context.Context,
+	service *data.Service,
+//endregion
+// region CODE_REGION(COMMON_RUNFUNCPART2)
+) RunFunc {
+	return func(ctx context.Context, args []string) error {
+		//endregion
+// region CODE_REGION(MANAGEDSERVICE_GROUP)
+
+	// create managed Service group
+	terminated := server.NewTerminatedNotifier()
+	msvc := []servicegroup.ManagedService{}
+
+	migrateSvc := servicegroup.NewManagedService(log, service, nil, nil)
+	msvc = append(msvc, migrateSvc)
+// endregion
+// add additional services if needed
+
+// region CODE_REGION(CREATE_FLOWCONTROL)
+	msg := servicegroup.NewManagedServiceGroup(terminated, nil, msvc...)
+	msg.Start()
+// endregion
+
+// region CODE_REGION(MIGRATE)
+db := stdlib.OpenDBFromPool(service.GetConnectionPool())
+		provider, err := getProvider(ctx, log, db)
+		if err != nil {
+			return err
+		}
+		logSources(ctx, log, provider)
+		err = logStatus(ctx, log, provider)
+		if err != nil {
+			return err
+		}
+		var results []*goose.MigrationResult
+		if conf.Down {
+			if  (conf.Version > 0) || (conf.ToVersion) {
+				results, err = downTo(ctx, log, provider, int64(conf.Version))
+			} else {
+				results = nil
+				// we dont allow unspecified downmigrations. This is to prevent accidental destruction of the db
+				err = errors.New("version required")
+			}
+
+		} else {
+			if conf.Version > 0 {
+				results, err = upTo(ctx, log, provider, int64(conf.Version))
+			} else {
+				results, err = up(ctx, log, provider)
+			}
+		}
+		if err != nil {
+			return err
+		}
+		logResults(log, results)
+// endregion
+	// All done allow things to shut down
+	close(terminated)
+// region CODE_REGION(CREATE_FLOWCONTROL2)
+	msg.Wait()
+// endregion
+		return nil
+	}
+}
+
+// region CODE_REGION(MIGRATION_HELPERS)
+func logResults(log logr.Logger, results []*goose.MigrationResult) {
+	for _, r := range results {
+		log.Info("result", "type", r.Source.Type, "sql-version", r.Source.Version, "direction", r.Direction, "empty", r.Empty, "duration", r.Duration)
+	}
+}
+func up(ctx context.Context, log logr.Logger, provider *goose.Provider) ([]*goose.MigrationResult, error) {
+	return provider.Up(ctx)
+}
+
+func upTo(ctx context.Context, log logr.Logger, provider *goose.Provider, version int64) ([]*goose.MigrationResult, error) {
+	return provider.UpTo(ctx, version)
+}
+
+func downTo(ctx context.Context, log logr.Logger, provider *goose.Provider, version int64) ([]*goose.MigrationResult, error) {
+	return provider.DownTo(ctx, version)
+}
+
+func getProvider(ctx context.Context, log logr.Logger, db *sql.DB) (*goose.Provider, error) {
+	fs, err := migrate.GetSqlMigrations()
+	if err != nil {
+		return nil, err
+	}
+	sessionLocker, err := lock.NewPostgresSessionLocker(
+		// Timeout after 30min. Try every 15s up to 120 times.
+		lock.WithLockTimeout(15, 120),
+	)
+	if err != nil {
+		return nil, err
+	}
+	provider, err := goose.NewProvider(database.DialectPostgres, db, fs, goose.WithSessionLocker(sessionLocker))
+	if err != nil {
+		return nil, err
+	}
+
+	return provider, nil
+}
+
+func logSources(ctx context.Context, log logr.Logger, provider *goose.Provider) {
+	sources := provider.ListSources()
+	for _, s := range sources {
+		log.Info("sources", "type", s.Type, "sql-version", s.Version, "path", filepath.Base(s.Path))
+	}
+}
+func logStatus(ctx context.Context, log logr.Logger, provider *goose.Provider) error {
+	stats, err := provider.Status(ctx)
+	if err != nil {
+		return err
+	}
+	for _, s := range stats {
+		log.Info("status", "type", s.Source.Type, "sql-version", s.Source.Version, "state", s.State)
+	}
+	return nil
+}
+//endregion

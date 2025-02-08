@@ -1,0 +1,22 @@
+!!pathreplace CONFIG {{.Command.Name}}cfg
+//go:build wireinject
+// +build wireinject
+
+// The build tag makes sure the stub is not built in the final build.
+
+{{ CodeSectionFileHeader | ToGoComment }}
+
+package {{.Command.Name | ToGoPackageName}}cfg
+
+import (
+// region CODE_REGION(COMMON_IMPORT)
+	"github.com/google/wire"
+// endregion
+)
+
+// region CODE_REGION(PROVIDE_CONFIG_SET)
+// ConfigProviderSet provides Config for {{.Command.Name}}cmd
+var ConfigProviderSet = wire.NewSet(
+	ProvideConfig,
+//endregion
+)

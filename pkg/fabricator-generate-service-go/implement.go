@@ -9,8 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"code.cestus.io/libs/codegenerator/pkg/templating"
+	fabricatorgenerateapigo "code.cestus.io/tools/fabricator-generate-api-go/pkg/fabricator-generate-api-go"
+	fabricatorgeneratetoolgo "code.cestus.io/tools/fabricator-generate-tool-go/pkg/fabricator-generate-tool-go"
 
 	"code.cestus.io/libs/buildinfo"
 	"code.cestus.io/tools/fabricator/pkg/fabricator"
@@ -36,6 +39,49 @@ func (p *plugin) GoModule() string {
 	return p.goModule
 }
 
+type ExtCommandInfo struct {
+	APIOverview  APIOverview
+	IsServeCmd   bool
+	IsDebugCmd   bool
+	IsMigrateCmd bool
+}
+
+type CommandGenContext struct {
+	CodeGenerator   buildinfo.BuildInfo
+	GoModule        string
+	PluginComponent PluginComponent
+	Command         fabricatorgeneratetoolgo.Command
+	ExtInfo         ExtCommandInfo
+}
+
+type APIDescriptor struct {
+	API         API
+	BaseVarName string
+	IsV1        bool
+	IsPlayerAPI bool
+	IsS2SAPI    bool
+	IsAdminAPI  bool
+	IsPublicAPI bool
+}
+
+type APIOverview struct {
+	Player       []APIDescriptor
+	S2S          []APIDescriptor
+	Admin        []APIDescriptor
+	Public       []APIDescriptor
+	HasPlayerAPI bool
+	HasS2SAPI    bool
+	HasAdminAPI  bool
+	HasPublicAPI bool
+}
+
+type APIGenContext struct {
+	CodeGenerator   buildinfo.BuildInfo
+	GoModule        string
+	PluginComponent PluginComponent
+	APIDescriptor   APIDescriptor
+}
+
 // region CODE_REGION(GENERATION_CONTEXT)
 type GenerationContext struct {
 	CodeGenerator       buildinfo.BuildInfo
@@ -45,8 +91,64 @@ type GenerationContext struct {
 	ReplaceDependencies ReplaceDependencies
 	ToolDependencies    ToolDependencies
 	// endregion
+	CommandGenContexts []CommandGenContext
+	APIGenContexts     []APIGenContext
+	APIOverview        APIOverview
 }
 
+func resolveApiFields(api API, serviceName string) API {
+	if api.ServiceName == "" {
+		api.ServiceName = serviceName
+	}
+	if api.GoModule == "" {
+		if strings.EqualFold(api.Version, "v1") {
+			api.GoModule = "code.cestus.io/api/" + api.ServiceName
+		} else {
+			api.GoModule = "code.cestus.io/api/" + api.ServiceName + "/" + api.Version
+		}
+	}
+	return api
+}
+func apiDescriptorFromApi(api API, serviceName string) APIDescriptor {
+	a := APIDescriptor{
+		API:         resolveApiFields(api, serviceName),
+		BaseVarName: fmt.Sprintf("%s%s%s", api.ServiceName, templating.Capitalize(api.Version), api.Kind.String()),
+		IsV1:        strings.EqualFold(api.Version, "v1"),
+	}
+	switch api.Kind {
+	case fabricatorgenerateapigo.Admin:
+		a.IsAdminAPI = true
+	case fabricatorgenerateapigo.Player:
+		a.IsPlayerAPI = true
+	case fabricatorgenerateapigo.Public:
+		a.IsPublicAPI = true
+	case fabricatorgenerateapigo.S2S:
+		a.IsS2SAPI = true
+	}
+	return a
+}
+
+func apiOverviewFromAPISlice(apis []API, serviceName string) APIOverview {
+	s := APIOverview{}
+	for _, api := range apis {
+		api = resolveApiFields(api, serviceName)
+		switch api.Kind {
+		case fabricatorgenerateapigo.Public:
+			s.Public = append(s.Public, apiDescriptorFromApi(api, serviceName))
+			s.HasPublicAPI = true
+		case fabricatorgenerateapigo.Player:
+			s.Player = append(s.Player, apiDescriptorFromApi(api, serviceName))
+			s.HasPlayerAPI = true
+		case fabricatorgenerateapigo.S2S:
+			s.S2S = append(s.S2S, apiDescriptorFromApi(api, serviceName))
+			s.HasS2SAPI = true
+		case fabricatorgenerateapigo.Admin:
+			s.Admin = append(s.Admin, apiDescriptorFromApi(api, serviceName))
+			s.HasAdminAPI = true
+		}
+	}
+	return s
+}
 func (p *plugin) generationContexts(ctx context.Context, io fabricator.IOStreams) ([]GenerationContext, error) {
 	var contexts []GenerationContext
 	for _, component := range p.pluginConfig.Components {
@@ -57,6 +159,7 @@ func (p *plugin) generationContexts(ctx context.Context, io fabricator.IOStreams
 			PinDependencies:     DefaultPins,
 			ReplaceDependencies: DefaultReplacements,
 			ToolDependencies:    DefaultToolDependencies,
+			APIOverview:         apiOverviewFromAPISlice(component.Spec.APIs, component.Spec.ToolName),
 		}
 		// override defaults if necessary
 		for k, o := range component.Spec.PinDependency {
@@ -68,12 +171,160 @@ func (p *plugin) generationContexts(ctx context.Context, io fabricator.IOStreams
 		for k, o := range component.Spec.ToolDependency {
 			gencontext.ToolDependencies[k] = o
 		}
+		// Allow specifying of serve,debug and migrate commands, but add a default if they dont exist
+		var hasServeCmd, hasDebugCmd, hasMigrateCmd bool
+		for _, c := range component.Spec.Commands {
+			cc := CommandGenContext{
+				CodeGenerator:   buildinfo.ProvideBuildInfo(),
+				GoModule:        p.GoModule(),
+				PluginComponent: component,
+				Command:         c,
+			}
+			switch c.Name {
+			case "serve":
+				cc.ExtInfo.IsServeCmd = true
+				hasServeCmd = true
+			case "debug":
+				cc.ExtInfo.IsDebugCmd = true
+				hasDebugCmd = true
+			case "migrate":
+				cc.ExtInfo.IsMigrateCmd = true
+				hasMigrateCmd = true
+			}
+			cc.ExtInfo.APIOverview = gencontext.APIOverview
+			gencontext.CommandGenContexts = append(gencontext.CommandGenContexts, cc)
+		}
+		// add default commands
+		if !hasServeCmd {
+			c := fabricatorgeneratetoolgo.Command{
+				Name: "serve",
+			}
+			cc := CommandGenContext{
+				CodeGenerator:   buildinfo.ProvideBuildInfo(),
+				GoModule:        p.GoModule(),
+				PluginComponent: component,
+				Command:         c,
+			}
+			gencontext.PluginComponent.Spec.Commands = append(gencontext.PluginComponent.Spec.Commands, c)
+			cc.ExtInfo.IsServeCmd = true
+			cc.ExtInfo.APIOverview = gencontext.APIOverview
+			gencontext.CommandGenContexts = append(gencontext.CommandGenContexts, cc)
+		}
+		if !hasMigrateCmd && gencontext.PluginComponent.Spec.HasRelationalDatabase {
+			c := fabricatorgeneratetoolgo.Command{
+				Name: "migrate",
+			}
+			cc := CommandGenContext{
+				CodeGenerator:   buildinfo.ProvideBuildInfo(),
+				GoModule:        p.GoModule(),
+				PluginComponent: component,
+				Command:         c,
+			}
+			gencontext.PluginComponent.Spec.Commands = append(gencontext.PluginComponent.Spec.Commands, c)
+			cc.ExtInfo.IsMigrateCmd = true
+			cc.ExtInfo.APIOverview = gencontext.APIOverview
+			gencontext.CommandGenContexts = append(gencontext.CommandGenContexts, cc)
+		}
+		if !hasDebugCmd {
+			c := fabricatorgeneratetoolgo.Command{
+				Name: "debug",
+			}
+			cc := CommandGenContext{
+				CodeGenerator:   buildinfo.ProvideBuildInfo(),
+				GoModule:        p.GoModule(),
+				PluginComponent: component,
+				Command:         c,
+			}
+			gencontext.PluginComponent.Spec.Commands = append(gencontext.PluginComponent.Spec.Commands, c)
+			cc.ExtInfo.IsDebugCmd = true
+			cc.ExtInfo.APIOverview = gencontext.APIOverview
+			gencontext.CommandGenContexts = append(gencontext.CommandGenContexts, cc)
+		}
+		for _, a := range component.Spec.APIs {
+			ac := APIGenContext{
+				CodeGenerator:   buildinfo.ProvideBuildInfo(),
+				GoModule:        p.GoModule(),
+				PluginComponent: component,
+				APIDescriptor:   apiDescriptorFromApi(a, component.Spec.ToolName),
+			}
+			gencontext.APIGenContexts = append(gencontext.APIGenContexts, ac)
+		}
+
 		contexts = append(contexts, gencontext)
 	}
 
 	return contexts, nil
 }
 
+func generateCommand(ctx context.Context, io fabricator.IOStreams, templates []templating.Template, root string, genCtx CommandGenContext) (err error) {
+	var genCmds [][]string
+	executor := helpers.NewExecutor(root, io)
+	generatedFiles, generationCommands, err := templating.Render(templates, root, genCtx, []string{}...)
+	if err != nil {
+		return fmt.Errorf("failed to generate template for %s: %s", PluginName, err)
+	}
+
+	for _, generatedFile := range generatedFiles {
+		generatedFile, _ = filepath.Rel(root, generatedFile)
+		fmt.Fprintf(io.Out, "%s\n", generatedFile)
+	}
+	genCmds = append(genCmds, generationCommands...)
+
+	// format files first so we dont run into generation failures
+	for _, generationCommand := range genCmds {
+		if generationCommand[0] == "goimports" {
+			if err = executor.Run(ctx, generationCommand[0], generationCommand[1:]...); err != nil {
+				return fmt.Errorf("failed to run template generation commands for project: %s", err)
+			}
+		}
+	}
+
+	for _, generationCommand := range genCmds {
+		if err = executor.Run(ctx, generationCommand[0], generationCommand[1:]...); err != nil {
+			return fmt.Errorf("failed to run template generation commands for project: %s", err)
+		}
+	}
+	return nil
+}
+
+func generateAPI(ctx context.Context, io fabricator.IOStreams, templates []templating.Template, root string, genCtx APIGenContext) (err error) {
+	var extGen [][]string
+	var genCmds [][]string
+	executor := helpers.NewExecutor(root, io)
+	generatedFiles, generationCommands, err := templating.Render(templates, root, genCtx, []string{}...)
+	if err != nil {
+		return fmt.Errorf("failed to generate template for %s: %s", PluginName, err)
+	}
+
+	for _, generatedFile := range generatedFiles {
+		generatedFile, _ = filepath.Rel(root, generatedFile)
+		fmt.Fprintf(io.Out, "%s\n", generatedFile)
+	}
+	genCmds = append(genCmds, generationCommands...)
+	for _, v := range genCtx.APIDescriptor.API.ReplaceDependency {
+		extGen = append(extGen, []string{"go", "mod", "edit", "--replace", fmt.Sprintf("%s=%s", v.Name, v.With)})
+	}
+	for _, generationCommand := range extGen {
+		if err = executor.Run(ctx, generationCommand[0], generationCommand[1:]...); err != nil {
+			return fmt.Errorf("failed to run template generation commands for project: %s", err)
+		}
+	}
+	// format files first so we dont run into generation failures
+	for _, generationCommand := range genCmds {
+		if generationCommand[0] == "goimports" {
+			if err = executor.Run(ctx, generationCommand[0], generationCommand[1:]...); err != nil {
+				return fmt.Errorf("failed to run template generation commands for project: %s", err)
+			}
+		}
+	}
+
+	for _, generationCommand := range genCmds {
+		if err = executor.Run(ctx, generationCommand[0], generationCommand[1:]...); err != nil {
+			return fmt.Errorf("failed to run template generation commands for project: %s", err)
+		}
+	}
+	return nil
+}
 func (p *plugin) Generate(ctx context.Context, io fabricator.IOStreams, patterns ...string) (err error) {
 	genCtxs, err := p.generationContexts(ctx, io)
 	if err != nil {
@@ -83,6 +334,36 @@ func (p *plugin) Generate(ctx context.Context, io fabricator.IOStreams, patterns
 	var genCmds [][]string
 	executor := helpers.NewExecutor(p.Root(), io)
 	for _, genCtx := range genCtxs {
+		// generate the commands first
+		for _, cc := range genCtx.CommandGenContexts {
+			cpack, err := p.packprovider.Provide(PluginTemplateName, "command/go")
+			if err != nil {
+				return fmt.Errorf("failed to load pack for commands: %s", err)
+			}
+			ctemplates, err := cpack.LoadTemplates()
+			if err != nil {
+				return fmt.Errorf("failed to load template for commands: %s", err)
+			}
+			err = generateCommand(ctx, io, ctemplates, p.Root(), cc)
+			if err != nil {
+				return fmt.Errorf("failed to generate template for command: %s: %s", cc.Command.Name, err)
+			}
+		}
+		// then API specifics
+		for _, ac := range genCtx.APIGenContexts {
+			cpack, err := p.packprovider.Provide(PluginTemplateName, "api/go")
+			if err != nil {
+				return fmt.Errorf("failed to load pack for apis: %s", err)
+			}
+			ctemplates, err := cpack.LoadTemplates()
+			if err != nil {
+				return fmt.Errorf("failed to load template for apis: %s", err)
+			}
+			err = generateAPI(ctx, io, ctemplates, p.Root(), ac)
+			if err != nil {
+				return fmt.Errorf("failed to generate template for api: %s: %s", ac.APIDescriptor.API.Kind.String(), err)
+			}
+		}
 		templates, err := p.pack.LoadTemplates()
 		if err != nil {
 			return fmt.Errorf("failed to load template for plugin: %s", err)
@@ -144,7 +425,7 @@ func newPlugin(ctx context.Context, io fabricator.IOStreams, config PluginConfig
 		goModule:     goModule.Path,
 	}
 
-	pack, err := packprovider.Provide(PluginName, "go")
+	pack, err := packprovider.Provide(PluginTemplateName, "go")
 	if err != nil {
 		return plugin, fmt.Errorf("failed to load pack for plugin: %s", err)
 	}
@@ -155,6 +436,7 @@ func newPlugin(ctx context.Context, io fabricator.IOStreams, config PluginConfig
 	}
 
 	plugin.pack = pack
+
 	plugin.packprovider = packprovider
 
 	return plugin, err

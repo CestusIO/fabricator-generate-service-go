@@ -1,0 +1,9 @@
+.PHONY: generate
+## Install tools
+all:
+#region CODE_REGION(service)
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.35.2
+	go install code.cestus.io/blaze/cmd/protoc-gen-blaze@v0.7.2
+	go install github.com/google/wire/cmd/wire@v0.6.0
+	go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.26.0
+#endregion

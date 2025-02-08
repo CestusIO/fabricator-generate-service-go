@@ -1,0 +1,13 @@
+// +build wireinject
+// The build tag makes sure the stub is not built in the final build.
+{{ CodeSectionFileHeader | ToGoComment }}
+
+package metrics
+
+import "github.com/google/wire"
+
+// MetricsProviderSet provides Metrics
+var MetricsProviderSet = wire.NewSet(
+	Provide,
+	wire.Bind(new({{.PluginComponent.Spec.ToolName | ToGoName}}Metrics), new(*Provider)),
+)

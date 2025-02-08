@@ -1,0 +1,6 @@
+!!if .ExtInfo.APIOverview.HasAdminAPI
+!!delimiters <<< >>>
+vars {
+  baseUrl: http://localhost:8003/<<<.PluginComponent.Spec.ToolName | ToLower>>>/v1/admin
+  token: {{process.env.LOCAL_ADMIN_TOKEN}}
+}

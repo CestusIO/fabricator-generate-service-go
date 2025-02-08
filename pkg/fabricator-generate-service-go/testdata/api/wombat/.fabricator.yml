@@ -1,0 +1,29 @@
+apiVersion: fabricator.cestus.io/v1alpha1
+kind: Config
+components:
+  - name: "fabricator-generate-api-go"
+    generator: fabricator-generate-api-go
+    spec:
+      pinDependency:
+      #      "github.com/test":
+      #        name: "github.com/test"
+      #        version: "v1.0.0"
+      replaceDependency:
+      #      "github.com/test":
+      #        name: "github.com/test"
+      #        with: "github.com/test@v1.2.4"
+      toolDependency:
+      #        "github.com/test":
+      #         name: "github.com/test"
+      serviceName: "wombat"
+      apis:
+        - kind: Player
+          version: v1
+        - kind: Player
+          version: v2
+        - kind: S2S
+          version: v1
+        - kind: Admin
+          version: v1
+        - kind: Public
+          version: v1

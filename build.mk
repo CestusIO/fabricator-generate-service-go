@@ -13,7 +13,7 @@ PLATFORMS               ?= linux
 # List of architectures to target [amd64/arm64]
 ARCHITECTURES           := amd64
 # Name of the app used for single application builds
-APP 					:= 
+APP 					:= fabricator-generate-service-go
 # List of applications to build (must reside in ./cmd/<name>)
 APPLICATIONS            := fabricator-generate-service-go
 # Buildtime of a version will be passed as ldflag to go compiler

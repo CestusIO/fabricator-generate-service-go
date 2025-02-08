@@ -7,7 +7,9 @@ package fabricatorgenerateservicego_test
 import (
 	"os"
 
+	fabricatorgenerateapigo "code.cestus.io/tools/fabricator-generate-api-go/pkg/fabricator-generate-api-go"
 	fabricatorgenerateservicego "code.cestus.io/tools/fabricator-generate-service-go/pkg/fabricator-generate-service-go"
+	fabricatorgeneratetoolgo "code.cestus.io/tools/fabricator-generate-tool-go/pkg/fabricator-generate-tool-go"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -26,9 +28,86 @@ var _ = Describe("Config", func() {
 					Name:      "fabricator-generate-service-go",
 					Generator: "fabricator-generate-service-go",
 					Spec: fabricatorgenerateservicego.Spec{
-						PinDependency:     nil,
-						ReplaceDependency: nil,
-						ToolDependency:    nil,
+						PinDependency:         nil,
+						ReplaceDependency:     nil,
+						ToolDependency:        nil,
+						ToolName:              "wombat",
+						HasRelationalDatabase: true,
+						APIs: []fabricatorgenerateservicego.API{
+							{
+								ServiceName: "wombat",
+								GoModule:    "example.com/api/wombat",
+								Kind:        fabricatorgenerateapigo.Admin,
+								Version:     "v1",
+								ReplaceDependency: fabricatorgenerateservicego.ReplaceDependencies{
+									"example.com/api/wombat": fabricatorgenerateservicego.ReplaceDependency{
+										Name: "example.com/api/wombat",
+										With: "../api/wombat",
+									},
+								},
+							},
+							{
+								ServiceName: "wombat",
+								GoModule:    "example.com/api/wombat",
+								Kind:        fabricatorgenerateapigo.Player,
+								Version:     "v1",
+								ReplaceDependency: fabricatorgenerateservicego.ReplaceDependencies{
+									"example.com/api/wombat": fabricatorgenerateservicego.ReplaceDependency{
+										Name: "example.com/api/wombat",
+										With: "../api/wombat",
+									},
+								},
+							},
+							{
+								ServiceName: "wombat",
+								GoModule:    "example.com/api/wombat/v2",
+								Kind:        fabricatorgenerateapigo.Player,
+								Version:     "v2",
+								ReplaceDependency: fabricatorgenerateservicego.ReplaceDependencies{
+									"example.com/api/wombat/v2": fabricatorgenerateservicego.ReplaceDependency{
+										Name: "example.com/api/wombat/v2",
+										With: "../api/wombat/v2",
+									},
+								},
+							},
+							{
+								ServiceName: "wombat",
+								GoModule:    "example.com/api/wombat",
+								Kind:        fabricatorgenerateapigo.Public,
+								Version:     "v1",
+								ReplaceDependency: fabricatorgenerateservicego.ReplaceDependencies{
+									"example.com/api/wombat": fabricatorgenerateservicego.ReplaceDependency{
+										Name: "example.com/api/wombat",
+										With: "../api/wombat",
+									},
+								},
+							},
+							{
+								ServiceName: "wombat",
+								GoModule:    "example.com/api/wombat",
+								Kind:        fabricatorgenerateapigo.S2S,
+								Version:     "v1",
+								ReplaceDependency: fabricatorgenerateservicego.ReplaceDependencies{
+									"example.com/api/wombat": fabricatorgenerateservicego.ReplaceDependency{
+										Name: "example.com/api/wombat",
+										With: "../api/wombat",
+									},
+								},
+							},
+						},
+						Commands: []fabricatorgeneratetoolgo.Command{
+							{
+								Name: "ls",
+								Flags: []fabricatorgeneratetoolgo.Flag{
+									{
+										Name:    "all",
+										Type:    "bool",
+										Default: "false",
+										Usage:   "set to true",
+									},
+								},
+							},
+						},
 					},
 				},
 			},

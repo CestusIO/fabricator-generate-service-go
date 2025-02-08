@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 
+	fabricatorgenerateapigo "code.cestus.io/tools/fabricator-generate-api-go/pkg/fabricator-generate-api-go"
+	fabricatorgeneratetoolgo "code.cestus.io/tools/fabricator-generate-tool-go/pkg/fabricator-generate-tool-go"
 	"code.cestus.io/tools/fabricator/pkg/fabricator"
 	"gopkg.in/yaml.v3"
 )
@@ -34,11 +36,22 @@ type ReplaceDependency struct {
 
 // Spec contains the specification for the plugin
 type Spec struct {
-	PinDependency     PinDependencies     `yaml:"pinDependency,omitempty" json:"pinDependency,omitempty"`
-	ReplaceDependency ReplaceDependencies `yaml:"replaceDependency,omitempty" json:"replaceDependency,omitempty"`
-	ToolDependency    ToolDependencies    `yaml:"toolDependency,omitempty" json:"toolDependency,omitempty"`
+	PinDependency         PinDependencies                    `yaml:"pinDependency,omitempty" json:"pinDependency,omitempty"`
+	ReplaceDependency     ReplaceDependencies                `yaml:"replaceDependency,omitempty" json:"replaceDependency,omitempty"`
+	ToolDependency        ToolDependencies                   `yaml:"toolDependency,omitempty" json:"toolDependency,omitempty"`
+	ToolName              string                             `yaml:"serviceName" json:"serviceName"`
+	APIs                  []API                              `yaml:"apis" json:"apis"`
+	Commands              []fabricatorgeneratetoolgo.Command `yaml:"commands" json:"commands"`
+	HasRelationalDatabase bool                               `yaml:"hasRelationalDatabase" json:"hasRelationalDatabase"`
+}
 
-	ExampleValue string `yaml:"exampleValue" json:"exampleValue"`
+// API defines an api implemented by the service
+type API struct {
+	ServiceName       string                          `yaml:"serviceName,omitempty" json:"serviceName,omitempty"`
+	GoModule          string                          `yaml:"goModule,omitempty" json:"goModule,omitempty"`
+	ReplaceDependency ReplaceDependencies             `yaml:"replaceDependency,omitempty" json:"replaceDependency,omitempty"`
+	Version           string                          `yaml:"version" json:"version"`
+	Kind              fabricatorgenerateapigo.APIKind `yaml:"kind" json:"kind"`
 }
 
 // region CODE_REGION(PLUGIN_COMPONENT)

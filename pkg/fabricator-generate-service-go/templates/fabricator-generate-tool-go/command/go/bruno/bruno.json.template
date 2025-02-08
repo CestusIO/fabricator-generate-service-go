@@ -1,0 +1,10 @@
+!!delimiters <<< >>>
+{
+  "version": "1",
+  "name": "<<<.PluginComponent.Spec.ToolName | ToLower>>>",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

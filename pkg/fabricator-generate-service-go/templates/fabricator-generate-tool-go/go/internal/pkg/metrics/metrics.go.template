@@ -1,0 +1,52 @@
+{{ CodeSectionFileHeader | ToGoComment }}
+
+package metrics
+
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+	"code.cestus.io/libs/buildinfo"
+
+	"code.cestus.io/libs/gotools/pkg/metrics"
+)
+
+// {{.PluginComponent.Spec.ToolName | ToGoName}}Metrics is a interface for the benefit of testing
+type {{.PluginComponent.Spec.ToolName | ToGoName}}Metrics interface {
+	TestMetric(tookSeconds float64, success bool)
+}
+
+// Provider is a metrics provider
+type Provider struct {
+	*metrics.Provider
+	testMetric   *prometheus.HistogramVec
+}
+
+// Provide creates a metrics provider
+func Provide(buildinfo buildinfo.BuildInfo) *Provider {
+    testMetric := prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: buildinfo.Name,
+		Name:      "test_metric_name",
+		Help:      "test metric description",
+		Buckets:   prometheus.DefBuckets,
+	}, []string{"error"})
+
+	p := &Provider{
+		Provider: metrics.NewProvider(buildinfo),
+		testMetric: testMetric,
+	}
+    p.MustRegister(testMetric)
+	p.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	p.MustRegister(collectors.NewGoCollector())
+	return p
+}
+
+// TestMetric is a testmetric
+func (s *Provider) TestMetric(tookSeconds float64, success bool) {
+	switch success {
+	case false:
+		s.testMetric.WithLabelValues("error").Observe(tookSeconds)
+
+	default:
+		s.testMetric.WithLabelValues("success").Observe(tookSeconds)
+	}
+}

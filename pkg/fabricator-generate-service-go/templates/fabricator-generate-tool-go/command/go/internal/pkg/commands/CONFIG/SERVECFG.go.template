@@ -1,0 +1,70 @@
+!!if .ExtInfo.IsServeCmd
+!!pathreplace CONFIG {{.Command.Name}}cfg
+!!filename config.go
+{{ CodeSectionFileHeader | ToGoComment }}
+package {{.Command.Name | ToGoPackageName}}cfg
+
+import (
+// region CODE_REGION(COMMON_IMPORTS)
+	"github.com/go-logr/logr"
+	"github.com/peterbourgon/ff/v4"
+	"github.com/peterbourgon/ff/v4/fftoml"
+
+    "code.cestus.io/libs/flags/pkg/flags"
+
+	"{{.GoModule}}/internal/pkg/commands/rootcmd"
+//endregion
+
+)
+
+// region CODE_REGION(CONFIG)
+type Config struct {
+	RootConfig *rootcmd.Config
+	FS         *flags.FlagSet
+	Log        logr.Logger
+	IO         rootcmd.IOStreams
+	Options    []ff.Option
+{{range $flag :=.Command.Flags -}}
+    {{$flag.Name | ToGoName}} {{$flag.Type | ToLower}}
+{{end -}}
+	//endregion
+}
+
+// region CODE_REGION(COMMON_CONFIG)
+func ProvideConfig(rootConfig *rootcmd.Config,
+	log logr.Logger,
+	io rootcmd.IOStreams,
+	//endregion
+	// region CODE_REGION(COMMON_RET_CONFIG)
+) *Config {
+	fs := flags.NewFlagSet("{{.PluginComponent.Spec.ToolName | ToLower}} {{.Command.Name | ToLower}}") 
+	fs.SetParent(rootConfig.Fs)
+	cfg := Config{
+		RootConfig: rootConfig,
+		Log:        log,
+		IO:         io,
+		Options: []ff.Option{
+			ff.WithConfigFileParser(fftoml.Parse),
+			ff.WithEnvVarPrefix("{{.PluginComponent.Spec.ToolName | ToEnvVarName}}_{{.Command.Name | ToEnvVarName}}"),
+			ff.WithConfigFile(*rootConfig.ConfigFile()),
+			ff.WithConfigAllowMissingFile(),
+			ff.WithConfigIgnoreUndefinedFlags(),
+			fs.WithArgsIgnoreUndefinedFlags(),
+		},
+	}
+	cfg.FS = fs
+	fs.ApplyOptions(cfg.Options...)
+
+	{{range $flag :=.Command.Flags -}}
+	   {{ if eq $flag.Type "bool" }}
+	    cfg.FS.{{$flag.Type | ToHumanNameTitle}}VarDefault(&cfg.{{$flag.Name | ToGoName}},0 , "{{$flag.Name | ToVarName}}", {{$flag.Default}}, "{{$flag.Usage}}")
+	   {{else}}
+		cfg.FS.{{$flag.Type | ToHumanNameTitle}}Var(&cfg.{{$flag.Name | ToGoName}},0 , "{{$flag.Name | ToVarName}}", {{$flag.Default}}, "{{$flag.Usage}}")
+	   {{end}}
+	{{end -}}
+
+	//endregion
+
+	rootConfig.RegisterFlags(cfg.FS)
+	return &cfg
+}

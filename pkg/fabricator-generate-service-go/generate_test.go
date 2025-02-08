@@ -15,14 +15,18 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"code.cestus.io/tools/fabricator-generate-service-go/internal/pkg/overlayfs"
 	"code.cestus.io/tools/fabricator-generate-service-go/pkg/fabricator-generate-service-go/templates"
+	tooltemplates "code.cestus.io/tools/fabricator-generate-tool-go/pkg/fabricator-generate-tool-go/templates"
 )
 
 var _ = Describe("Generation", func() {
 	It("Generates", func() {
 		ctx := context.Background()
 		packProvider := templating.NewPackProvider()
-		packProvider.RegisterProvider(templating.NewEmbededPackProvider(templates.GetTemplates()))
+		ofs := overlayfs.New(tooltemplates.GetTemplates(), templates.GetTemplates())
+		pp := templating.NewEmbededPackProvider(ofs)
+		packProvider.RegisterProvider(pp)
 		io := fabricator.NewGinkoTestIOStreams()
 		file, err := os.Open("./testdata/deserialize.yml")
 		Expect(err).ToNot(HaveOccurred())

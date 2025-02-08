@@ -8,10 +8,14 @@ It assumes the use of [conventional commits](https://www.conventionalcommits.org
 ## [Unreleased]
 
 
-<a name="unreleased"></a>
-## unreleased
+<a name="v0.0.1"></a>
+## v0.0.1
 ### Chores
+- initial generation
 - add fab file
 
+### Features
+- add implementation
 
-[Unreleased]: https://github.com/CestusIO/fabricator-generate-service-go/compare/unreleased...HEAD
+
+[Unreleased]: https://github.com/CestusIO/fabricator-generate-service-go/compare/v0.0.1...HEAD

@@ -1,0 +1,8 @@
+!!if .PluginComponent.Spec.HasRelationalDatabase
+
+-- name: ListTodo :many
+SELECT * FROM todos ORDER BY todo;
+
+-- name: AddTodo :one
+INSERT INTO todos (todo) VALUES ($1)
+RETURNING *;

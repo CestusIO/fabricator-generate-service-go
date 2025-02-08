@@ -15,11 +15,16 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"code.cestus.io/tools/fabricator-generate-service-go/internal/pkg/overlayfs"
 	"code.cestus.io/tools/fabricator-generate-service-go/pkg/fabricator-generate-service-go/templates"
+	tooltemplates "code.cestus.io/tools/fabricator-generate-tool-go/pkg/fabricator-generate-tool-go/templates"
 )
 
 // PluginName is the name of the plugin
 const PluginName string = "fabricator-generate-service-go"
+
+// PluginTemplateName is the rootname used for templates (this is a special case since we want to overlay filesystems)
+const PluginTemplateName string = "fabricator-generate-tool-go"
 
 // region CODE_REGION(OPTIONS)
 type options struct {
@@ -78,7 +83,8 @@ func (o *options) run(ctx context.Context) error {
 
 	templating.CodeGeneratorName = PluginName
 	packProvider := templating.NewPackProvider()
-	packProvider.RegisterProvider(templating.NewEmbededPackProvider(templates.GetTemplates()))
+	ofs := overlayfs.New(tooltemplates.GetTemplates(), templates.GetTemplates())
+	packProvider.RegisterProvider(templating.NewEmbededPackProvider(ofs))
 	plugin, err := newPlugin(ctx, o.IOStreams, config, o.RootOptions.RootDirectory, packProvider)
 
 	if err != nil {

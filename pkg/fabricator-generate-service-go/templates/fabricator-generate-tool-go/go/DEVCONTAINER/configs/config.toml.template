@@ -1,0 +1,12 @@
+!!pathreplace DEVCONTAINER .devcontainer
+{{ CodeSectionFileHeader | ToYAMLComment }}
+[app]
+    loglevel = "Debug2"
+    debug = "false"
+    profilingenabled = "false"
+[kestrel]
+    applicationid = "da2a7a69-b62a-4f1a-bbc3-ebf4010270e4"
+    environmentid = "6964ef04-7b89-4cac-a364-ce2b11cc8bdb"
+
+# [secrets]
+# enabled = "true"

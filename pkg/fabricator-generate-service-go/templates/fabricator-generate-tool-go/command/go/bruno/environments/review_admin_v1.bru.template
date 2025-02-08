@@ -1,0 +1,6 @@
+!!if .ExtInfo.APIOverview.HasAdminAPI
+!!delimiters <<< >>>
+vars {
+  baseUrl: https://admin.geomagic.org/951638b3-e767-4d44-b5d9-7e23d190f3dd/c24dc3ef-2f52-4f7f-a73b-3cb2206101b7/<<<.PluginComponent.Spec.ToolName | ToLower>>>/v1/admin
+  token: {{process.env.AP_ADMIN_TOKEN}}
+}

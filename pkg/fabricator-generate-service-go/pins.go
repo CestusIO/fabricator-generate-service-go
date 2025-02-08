@@ -9,10 +9,14 @@ package fabricatorgenerateservicego
 var DefaultPins PinDependencies = PinDependencies{
 	// endregion
 	//
-	//	"go.opentelemetry.io/otel": {
-	//		Name:    "go.opentelemetry.io/otel",
-	//		Version: "v0.20.0",
-	//	},
+	"go.opentelemetry.io/otel": {
+		Name:    "go.opentelemetry.io/otel",
+		Version: "v1.21.0",
+	},
+	"go.opentelemetry.io/otel/metric": {
+		Name:    "go.opentelemetry.io/otel/metric",
+		Version: "v1.21.0",
+	},
 }
 
 // region CODE_REGION(replacements)
