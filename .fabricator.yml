@@ -1,0 +1,18 @@
+apiVersion: fabricator.cestus.io/v1alpha1
+kind: Config
+components:
+  - name: fabricator-generate-service-go
+    generator: fabricator-generate-go
+    spec:
+      packageName: fabricator-generate-service-go
+  - name: fabricator-generate-service-go
+    generator: fabricator-generate-project-go
+    spec:
+      goModule: code.cestus.io/tools/fabricator-generate-service-go
+      repoURL: https://github.com/CestusIO/fabricator-generate-service-go
+      isTool: true
+  - name: fabricator-generate-service-go
+    generator: fabricator-generate-plugin-go
+    spec:
+      pluginName: fabricator-generate-service-go
+      isGenerationPlugin: true
