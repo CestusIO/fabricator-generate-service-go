@@ -1,0 +1,58 @@
+!!pathreplace TOOLNAME {{.PluginComponent.Spec.ToolName}}
+//go:build wireinject
+// +build wireinject
+// The build tag makes sure the stub is not built in the final build.
+{{ CodeSectionFileHeader | ToGoComment }}
+
+
+package main
+
+import (
+// region CODE_REGION(COMMON_IMPORTS)
+	"github.com/google/wire"
+
+	"code.cestus.io/libs/buildinfo"
+	"code.cestus.io/libs/log"
+	"code.cestus.io/libs/gotools/pkg/kestrel"
+	"code.cestus.io/libs/gotools/pkg/management/ready"
+	"code.cestus.io/libs/gotools/pkg/s2sauth"
+	"code.cestus.io/libs/gotools/pkg/tracing"
+	"code.cestus.io/libs/gotypes/pkg/types"
+	"{{.GoModule}}/internal/pkg/commands"
+	"{{.GoModule}}/internal/pkg/config"
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+	"{{.GoModule}}/internal/pkg/data"
+{{ end -}}
+	"{{.GoModule}}/internal/pkg/metrics"
+	"{{.GoModule}}/internal/pkg/secrets"
+// endregion
+)
+
+func InitializeCommandRunFunc() (commands.CommandRunFunc, func(), error) {
+	panic(
+		wire.Build(
+// region CODE_REGION(SERVICE)
+			commands.CommandsProviderSet,
+			buildinfo.BuildInfoProviderSet,
+			log.ZapperLogProviderSet,
+			tracing.ProvideOtlpPipeline,
+			tracing.ProvideDefaultIDGenerator,
+			kestrel.KestrelProviderSet,
+			types.TimeProviderSet,
+			types.IDProviderSet,
+			ZapDevelopmentConfigProvider,
+			ProvideLogVersionString,
+			ProvideDefaultAwsConfig,
+			ProvideContext,
+			config.ConfigProviderSet,
+			secrets.SecretsProviderSet,
+			metrics.MetricsProviderSet,
+			ready.ProvideReadyDelegate,
+			s2sauth.S2SAuthProviderSet,
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+			data.ProviderSet,
+{{ end -}}
+// endregion
+		),
+	)
+}

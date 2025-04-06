@@ -1,0 +1,7 @@
+!!if .ExtInfo.APIOverview.HasPlayerAPI
+!!delimiters <<< >>>
+vars {
+  baseUrl: https://player.geomagic.org/951638b3-e767-4d44-b5d9-7e23d190f3dd/ae22b5c3-d6c9-4bcb-9a55-e989b065e715/<<<.PluginComponent.Spec.ToolName | ToLower>>>/v1/player
+  token: {{process.env.RELEASE_PLAYER_TOKEN}}
+  playerID: {{process.env.AP_PLAYERID}}
+}

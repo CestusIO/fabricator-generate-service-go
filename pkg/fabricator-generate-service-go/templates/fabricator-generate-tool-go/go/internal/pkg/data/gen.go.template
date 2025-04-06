@@ -1,0 +1,5 @@
+!!if .PluginComponent.Spec.HasRelationalDatabase
+{{ CodeSectionFileHeader | ToGoComment }}
+package data
+
+//go:generate sqlc generate

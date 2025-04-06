@@ -1,0 +1,12 @@
+
+syntax = "proto3";
+
+package wombat.v1;
+option go_package = "example.com/api/wombat/v1/go/wombat_v1_common";
+
+// EchoMessage is a testmessage
+message EchoMessage{
+  // content is the content 
+  string content =1;
+}
+

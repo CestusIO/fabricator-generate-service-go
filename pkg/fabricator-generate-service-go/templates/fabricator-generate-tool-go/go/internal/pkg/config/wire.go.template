@@ -1,0 +1,26 @@
+//go:build wireinject
+// +build wireinject
+
+// The build tag makes sure the stub is not built in the final build.
+
+{{ CodeSectionFileHeader | ToGoComment }}
+
+package config
+
+import (
+// region CODE_REGION(COMMON_IMPORT)
+	"github.com/google/wire"
+// endregion
+)
+
+// region CODE_REGION(PROVIDE_CONFIG_SET)
+// ConfigProviderSet provides Config
+var ConfigProviderSet = wire.NewSet(
+	ProvideConfig,
+	ProvideFlagSet,
+	wire.FieldsOf(new(Config), "App", "Auth", "Kestrel", "Secrets", "S2SAuth"),
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+	wire.FieldsOf(new(Config), "Data"),
+{{ end -}}
+//endregion
+)

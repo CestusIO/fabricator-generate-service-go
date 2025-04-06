@@ -1,0 +1,22 @@
+!!pathreplace TOOLNAME {{.PluginComponent.Spec.ToolName}}
+package main
+
+import (
+	// region CODE_REGION(COMMON_IMPORTS)
+	"context"
+    
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/go-logr/logr"
+    // endregion
+)
+
+// region CODE_REGION(PROVIDERS)
+func ProvideDefaultAwsConfig(ctx context.Context, log logr.Logger) (aws.Config, error) {
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		log.Error(err, "aws config failed")
+	}
+	return cfg, err
+}
+// endregion

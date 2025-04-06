@@ -1,0 +1,12 @@
+
+syntax = "proto3";
+
+package wombat.v2;
+option go_package = "example.com/api/wombat/v2/go/wombat_v2_player";
+
+import "v2_common.proto";
+
+// PlayerWombat is a Player Wombat
+service PlayerWombat {
+     rpc Echo(EchoMessage) returns (EchoMessage);
+}

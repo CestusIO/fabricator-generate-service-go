@@ -1,0 +1,5 @@
+
+= Templates
+
+We are putting all the templates under fabricator-generate-tool-go so we can overlay the file systems
+

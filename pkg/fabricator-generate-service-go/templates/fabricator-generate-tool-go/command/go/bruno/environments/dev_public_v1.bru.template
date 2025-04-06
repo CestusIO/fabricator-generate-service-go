@@ -1,0 +1,6 @@
+!!if .ExtInfo.APIOverview.HasPublicAPI
+!!delimiters <<< >>>
+vars {
+  baseUrl: https://public.geomagic.org/951638b3-e767-4d44-b5d9-7e23d190f3dd/6964ef04-7b89-4cac-a364-ce2b11cc8bdb/<<<.PluginComponent.Spec.ToolName | ToLower>>>/v1/public
+  token: {{process.env.EMPTY_TOKEN}}
+}

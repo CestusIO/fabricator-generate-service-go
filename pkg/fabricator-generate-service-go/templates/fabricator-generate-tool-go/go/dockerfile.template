@@ -1,0 +1,8 @@
+!!filename Dockerfile
+# region CODE_REGION(CI)
+FROM ghcr.io/cestusio/container-base-go:latest
+LABEL maintainer="ralf@cestus.io"
+EXPOSE 8000 8001 8002 8003 8004
+ADD bin/{{.PluginComponent.Spec.ToolName | ToGoPackageName}}-linux-amd64 /
+CMD ["/{{.PluginComponent.Spec.ToolName | ToGoPackageName}}-linux-amd64", "serve"]
+#endregion

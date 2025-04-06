@@ -1,0 +1,7 @@
+!!if .ExtInfo.APIOverview.HasPlayerAPI
+!!delimiters <<< >>>
+vars {
+  baseUrl: http://localhost:8001/<<<.PluginComponent.Spec.ToolName | ToLower>>>/v1/player
+  token: {{process.env.LOCAL_PLAYER_TOKEN}}
+  playerID: {{process.env.LOCAL_PLAYERID}}
+}

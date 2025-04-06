@@ -1,0 +1,60 @@
+!!pathreplace PUBLICAPI publicapi_{{.APIDescriptor.API.Version}}
+!!if .APIDescriptor.IsPublicAPI
+{{ CodeSectionFileHeader | ToGoComment }}
+package publicapi_{{.APIDescriptor.API.Version}} 
+
+import (
+	"context"
+	"github.com/go-logr/logr"
+	{{ if .APIDescriptor.IsV1 }}
+	"{{.APIDescriptor.API.GoModule}}/{{.APIDescriptor.API.Version}}/go/{{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_common"
+	"{{.APIDescriptor.API.GoModule}}/{{.APIDescriptor.API.Version}}/go/{{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_public"
+	{{else}}
+	"{{.APIDescriptor.API.GoModule}}/go/{{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_common"
+	"{{.APIDescriptor.API.GoModule}}/go/{{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_public"
+	{{end}}
+	"{{.GoModule}}/internal/pkg/app"
+	"{{.GoModule}}/internal/pkg/metrics"
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+    "{{.GoModule}}/internal/pkg/data"
+{{ end -}}
+) 
+
+// region CODE_REGION(API_STRUCT)
+type publicapi_{{.APIDescriptor.API.Version | ToGoPackageName}} struct {
+	log               logr.Logger
+	config            app.Config
+	metrics           metrics.{{.PluginComponent.Spec.ToolName | ToGoName}}Metrics
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+    dataService *data.Service
+{{ end -}}
+// endregion
+}
+
+// region CODE_REGION(API_NEW)
+//New{{.APIDescriptor.API.ServiceName | ToGoName}} creates a new publicapi implementation
+func New{{.APIDescriptor.API.ServiceName | ToGoName}}(
+	log logr.Logger,
+	metrics metrics.{{.PluginComponent.Spec.ToolName | ToGoName}}Metrics,
+	config *app.Config,
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+    dataService *data.Service,
+{{ end -}}
+//endregion
+) {{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_public.Public{{.APIDescriptor.API.ServiceName | ToGoName}} {
+	// region CODE_REGION(API_IMPLEMENT)
+	return &publicapi_{{.APIDescriptor.API.Version | ToGoPackageName}}{
+		log:               log,
+		metrics:           metrics,
+		config:            *config,
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+        dataService: dataService,
+{{ end -}}
+	// endregion
+	}
+}
+
+//Echo implemements Echo from {{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_public.Public{{.APIDescriptor.API.ServiceName | ToGoName}}
+func (api *publicapi_{{.APIDescriptor.API.Version | ToGoPackageName}}) Echo(ctx context.Context, in *{{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_common.EchoMessage) (*{{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_common.EchoMessage, error) {
+	return &{{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_common.EchoMessage{Content: in.Content}, nil
+}

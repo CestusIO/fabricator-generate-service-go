@@ -1,0 +1,6 @@
+!!if .ExtInfo.APIOverview.HasS2SAPI
+!!delimiters <<< >>>
+vars {
+  baseUrl: http://localhost:8002/<<<.PluginComponent.Spec.ToolName | ToLower>>>/v1/s2s
+  token: {{process.env.LOCAL_S2S_TOKEN}}
+}

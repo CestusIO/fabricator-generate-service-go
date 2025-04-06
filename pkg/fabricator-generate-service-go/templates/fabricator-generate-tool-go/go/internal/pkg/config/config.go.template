@@ -1,0 +1,85 @@
+{{ CodeSectionFileHeader | ToGoComment }}
+package config
+
+import (
+// region CODE_REGION(COMMON_Import)
+	"os"
+
+	"github.com/go-logr/logr"
+	"github.com/peterbourgon/ff/v4"
+	"github.com/peterbourgon/ff/v4/fftoml"
+	
+	"code.cestus.io/libs/flags/pkg/flags"
+	"code.cestus.io/libs/gotools/pkg/authorizer"
+	"code.cestus.io/libs/gotools/pkg/kestrel"
+	"code.cestus.io/libs/gotools/pkg/secrets"
+	"code.cestus.io/libs/gotools/pkg/s2sauth"
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+    "{{.GoModule}}/internal/pkg/data"
+{{ end -}}
+	"{{.GoModule}}/internal/pkg/app"
+//endregion
+
+)
+
+// region CODE_REGION(COMMON_config)
+//Config is the {{.PluginComponent.Spec.ToolName}} config
+type Config struct {
+	App     *app.Config
+	Auth  *authorizer.Config
+	Kestrel *kestrel.Config
+	Secrets *secrets.Config
+	S2SAuth *s2sauth.Config
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+    Data *data.Config
+{{ end -}}
+// endregion
+}
+
+
+
+// region CODE_REGION(COMMON_PROVIDER)
+
+//ProvideFlagSet provides a flag set
+func ProvideFlagSet() *flags.FlagSet {
+	return flags.NewFlagSet("{{.PluginComponent.Spec.ToolName}}")
+}
+
+//ProvideConfig provides a config
+func ProvideConfig(flagset *flags.FlagSet) (Config, error) {
+	conf := Config{
+		App:     app.RegisterConfig(flagset),
+		Auth:  authorizer.RegisterConfig(flagset),
+		Kestrel: kestrel.RegisterConfig(flagset),
+		Secrets: secrets.RegisterConfig(flagset),
+		S2SAuth: s2sauth.RegisterConfig(flagset),
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+		Data: data.RegisterConfig(flagset),
+{{ end -}}
+// endregion
+	}
+// region CODE_REGION(COMMON_FLAGSET)
+	// skip until the first flag
+	args := os.Args
+	for len(args) > 0 {
+		arg := args[0]
+		if strings.HasPrefix(arg, "-") {
+			break
+		}
+		args = args[1:]
+	}
+	_ = flagset.String(0, "config", "", "config file (optional)")
+	err := ff.Parse(flagset, args,
+		ff.WithConfigFileFlag("config"),
+		ff.WithConfigAllowMissingFile(),
+		ff.WithConfigFileParser(fftoml.Parse),
+		ff.WithEnvVarPrefix("{{.PluginComponent.Spec.ToolName | ToEnvVarName}}"),
+		ff.WithConfigIgnoreUndefinedFlags(),
+		flagset.WithArgsIgnoreUndefinedFlags(),
+	)
+	if errors.Is(err, flags.ErrHelp) {
+		err = nil
+	}
+// endregion
+	return conf, err
+}

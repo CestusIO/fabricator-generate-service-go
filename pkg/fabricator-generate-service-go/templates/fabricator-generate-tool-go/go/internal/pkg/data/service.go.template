@@ -1,0 +1,72 @@
+!!if .PluginComponent.Spec.HasRelationalDatabase
+
+{{ CodeSectionFileHeader | ToGoComment }}
+package data
+
+import (
+// region CODE_REGION(COMMON_Import)
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+//endregion
+
+)
+
+// region CODE_REGION(COMMON_service)
+type Service struct {
+	Querier
+	pool *pgxpool.Pool
+	rawQuerier *Queries
+}
+
+func (s *Service) Start() error {
+	return nil
+}
+func (s *Service) Shutdown(ctx context.Context) error {
+	s.pool.Close()
+	return nil
+}
+func (s *Service) String() string {
+	return "Data"
+}
+
+func (s *Service) GetConnectionPool() *pgxpool.Pool {
+	return s.pool
+}
+
+func (s *Service) BeginTxWithOptions(ctx context.Context, options pgx.TxOptions) (tx pgx.Tx, ds Querier, err error) {
+	tx, err = s.pool.BeginTx(ctx, options)
+	if err != nil {
+		return
+	}
+	ds = s.rawQuerier.WithTx(tx)
+	return
+}
+func (s *Service) BeginTx(ctx context.Context) (tx pgx.Tx, ds Querier, err error) {
+	tx, ds, err = s.BeginTxWithOptions(ctx, pgx.TxOptions{})
+	return
+}
+// endregion
+
+// region CODE_REGION(COMMON_Provider)
+func ProvideService(ctx context.Context, conf *Config, secrets *Secrets) (*Service, error) {
+	url := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", secrets.Username, secrets.Password, secrets.Host, secrets.Port, secrets.DBName)
+	pool, err := pgxpool.New(ctx, url)
+	if err != nil {
+		return nil, err
+	}
+	tctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	err = pool.Ping(tctx)
+	if err != nil {
+		return nil, err
+	}
+	queries := New(pool)
+	return &Service{
+		pool:    pool,
+		Querier: queries}, nil
+}
+// endregion

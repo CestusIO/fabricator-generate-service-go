@@ -1,0 +1,306 @@
+!!if .ExtInfo.IsServeCmd
+!!pathreplace COMMAND {{.Command.Name}}cmd
+!!filename cmd.go
+{{ CodeSectionFileHeader | ToGoComment }}
+package {{.Command.Name | ToGoPackageName}}cmd
+
+import (
+// region CODE_REGION(COMMON_IMPORTS)
+	"context"
+	"fmt"
+	"time"
+	"os"
+
+	"code.cestus.io/blaze"
+	"code.cestus.io/blaze/pkg/server"
+	"code.cestus.io/blaze/pkg/servicegroup"
+	"code.cestus.io/libs/buildinfo"
+	"github.com/go-logr/logr"
+	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"	
+	"github.com/peterbourgon/ff/v4"
+
+	"code.cestus.io/libs/fftoml/pkg/fftoml"
+	"code.cestus.io/libs/gotools/pkg/authorizer"
+	"code.cestus.io/libs/gotools/pkg/httpwares/eos"
+	"code.cestus.io/libs/gotools/pkg/kestrel"
+	"code.cestus.io/libs/gotools/pkg/management"
+	"code.cestus.io/libs/gotools/pkg/management/ready"
+	"code.cestus.io/libs/gotools/pkg/secrets"
+	"code.cestus.io/libs/gotypes/pkg/types"
+	"{{.GoModule}}/internal/pkg/app"
+	"{{.GoModule}}/internal/pkg/metrics"
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+    "{{.GoModule}}/internal/pkg/data"
+{{ end -}}
+	{{ $save := . -}}
+	{{range $playerapi :=.ExtInfo.APIOverview.Player -}}
+		{{ if $playerapi.IsV1 -}}
+			"{{$playerapi.API.GoModule}}/{{$playerapi.API.Version}}/go/{{$playerapi.API.ServiceName | ToGoPackageName}}_{{$playerapi.API.Version}}_common"
+			"{{$playerapi.API.GoModule}}/{{$playerapi.API.Version}}/go/{{$playerapi.API.ServiceName | ToGoPackageName}}_{{$playerapi.API.Version}}_player"
+		{{else -}}
+			"{{$playerapi.API.GoModule}}/go/{{$playerapi.API.ServiceName | ToGoPackageName}}_{{$playerapi.API.Version}}_common"
+			"{{$playerapi.API.GoModule}}/go/{{$playerapi.API.ServiceName | ToGoPackageName}}_{{$playerapi.API.Version}}_player"
+		{{end -}}
+		"{{$save.GoModule}}/pkg/playerapi_{{$playerapi.API.Version}}"
+    {{end -}}
+	{{range $s2sapi :=.ExtInfo.APIOverview.S2S -}}
+		{{ if $s2sapi.IsV1 -}}
+			"{{$s2sapi.API.GoModule}}/{{$s2sapi.API.Version}}/go/{{$s2sapi.API.ServiceName | ToGoPackageName}}_{{$s2sapi.API.Version}}_common"
+			"{{$s2sapi.API.GoModule}}/{{$s2sapi.API.Version}}/go/{{$s2sapi.API.ServiceName | ToGoPackageName}}_{{$s2sapi.API.Version}}_s2s"
+		{{else -}}
+			"{{$s2sapi.API.GoModule}}/go/{{$s2sapi.API.ServiceName | ToGoPackageName}}_{{$s2sapi.API.Version}}_common"
+			"{{$s2sapi.API.GoModule}}/go/{{$s2sapi.API.ServiceName | ToGoPackageName}}_{{$s2sapi.API.Version}}_s2s"
+		{{end -}}
+		"{{$save.GoModule}}/pkg/s2sapi_{{$s2sapi.API.Version}}"
+	{{end -}}
+
+	{{range $adminapi :=.ExtInfo.APIOverview.Admin -}}
+		{{ if $adminapi.IsV1 -}}
+			"{{$adminapi.API.GoModule}}/{{$adminapi.API.Version}}/go/{{$adminapi.API.ServiceName | ToGoPackageName}}_{{$adminapi.API.Version}}_common"
+			"{{$adminapi.API.GoModule}}/{{$adminapi.API.Version}}/go/{{$adminapi.API.ServiceName | ToGoPackageName}}_{{$adminapi.API.Version}}_admin"
+		{{else -}}
+			"{{$adminapi.API.GoModule}}/go/{{$adminapi.API.ServiceName | ToGoPackageName}}_{{$adminapi.API.Version}}_common"
+			"{{$adminapi.API.GoModule}}/go/{{$adminapi.API.ServiceName | ToGoPackageName}}_{{$adminapi.API.Version}}_admin"
+		{{end -}}
+		"{{$save.GoModule}}/pkg/adminapi_{{$adminapi.API.Version}}"
+	{{end -}}
+
+	{{range $publicapi :=.ExtInfo.APIOverview.Public -}}
+		{{ if $publicapi.IsV1 -}}
+			"{{$publicapi.API.GoModule}}/{{$publicapi.API.Version}}/go/{{$publicapi.API.ServiceName | ToGoPackageName}}_{{$publicapi.API.Version}}_common"
+			"{{$publicapi.API.GoModule}}/{{$publicapi.API.Version}}/go/{{$publicapi.API.ServiceName | ToGoPackageName}}_{{$publicapi.API.Version}}_public"
+		{{else -}}
+			"{{$publicapi.API.GoModule}}/go/{{$publicapi.API.ServiceName | ToGoPackageName}}_{{$publicapi.API.Version}}_common"
+			"{{$publicapi.API.GoModule}}/go/{{$publicapi.API.ServiceName | ToGoPackageName}}_{{$publicapi.API.Version}}_public"
+		{{end -}}
+		"{{$save.GoModule}}/pkg/publicapi_{{$publicapi.API.Version}}"
+	{{end -}}
+	
+//endregion
+
+)
+
+// region CODE_REGION(IMPLEMENT)
+
+type apiDesc struct {
+	name string
+	port string
+}
+
+type RunFunc func(ctx context.Context, args []string) error
+
+// New returns a  ff.Command for the version subcommand.
+func New(conf *{{.Command.Name | ToGoPackageName}}cfg.Config, run RunFunc) *ff.Command {
+	return &ff.Command{
+		Name:       "{{.Command.Name | ToLower}}",
+		Usage: "{{.PluginComponent.Spec.ToolName | ToLower}} {{.Command.Name | ToLower}} [flags] ",
+		ShortHelp:  "{{.Command.Name | ToLower}}",
+		Flags:    conf.FS,
+		Exec:       run,
+//endregion
+	}
+}
+
+
+// region CODE_REGION(COMMON_RUNFUNC)
+func ProvideRunFunc(
+	log logr.Logger,
+	conf *{{.Command.Name | ToGoPackageName}}cfg.Config,
+	tracing trace.TracerProvider,
+	config *app.Config,
+	appsecrets *app.Secrets,
+	httpc *kestrel.HTTPClient,
+	s2sClient *kestrel.S2SAPIHTTPClient,
+	logConfig zap.Config,
+	ready *ready.Delegate,
+	metrics metrics.{{.PluginComponent.Spec.ToolName | ToGoName}}Metrics,
+	buildinfo buildinfo.BuildInfo,
+	idProvider types.IDProvider,
+	timeprovider types.TimeProvider,
+	kestrelConfig *kestrel.Config,
+	authConfig *authorizer.Config,
+	externalAdress kestrel.ExternalAddress,
+	secretConfig *secrets.Config,
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+    dataService *data.Service,
+{{ end -}}
+//endregion
+// region CODE_REGION(COMMON_RUNFUNCPART2)
+) RunFunc {
+	return func(ctx context.Context, args []string) error {
+		var monitoringAPI = apiDesc{
+			name: "monitoring",
+			port: config.MonitoringAPIPort,
+		}
+		//Player 
+		{{ if .ExtInfo.APIOverview.HasPlayerAPI }}
+		var playerAPI = apiDesc{
+			name: "public",
+			port: config.PlayerAPIPort,
+		}
+		{{ end }}
+		// S2S
+		{{ if .ExtInfo.APIOverview.HasS2SAPI }}
+		var s2sAPI = apiDesc{
+			name: "s2s",
+			port: config.S2SAPIPort,
+		}
+		{{ end }}
+		// Admin
+		{{ if .ExtInfo.APIOverview.HasAdminAPI }}
+		var adminAPI = apiDesc{
+			name: "admin",
+			port: config.AdminAPIPort,
+		}
+		{{ end }}
+		// Public
+		{{ if .ExtInfo.APIOverview.HasPublicAPI }}
+		var publicAPI = apiDesc{
+			name: "public",
+			port: config.PublicAPIPort,
+		}
+		{{ end }}
+
+		routePath := config.RoutePathPrefix
+		var adressPrefix string = ""
+		if config.Debug {
+			adressPrefix = "0.0.0.0"
+		}
+		log.Info("Initializing", "pid", os.Getpid(), "debug", config.Debug,  "profilingEnabled", config.ProfilingEnabled, "secretsEnabled", secretConfig.Enabled)
+		//endregion
+		// Business Logic (add new definitions here if needed)
+		{{ $save := . -}}
+		// Player
+			{{range $playerapi :=.ExtInfo.APIOverview.Player}}
+			{{$playerapi.BaseVarName}}Logic := playerapi_{{$playerapi.API.Version}}.New{{$playerapi.API.ServiceName | ToGoName}}(log, metrics, *config, *authConfig, idProvider,
+			timeprovider,
+			{{ if $save.PluginComponent.Spec.HasRelationalDatabase -}}
+    		dataService,
+			{{ end -}}
+			)
+			{{end}}
+		// S2S
+			{{range $s2sapi :=.ExtInfo.APIOverview.S2S}}
+			{{$s2sapi.BaseVarName}}Logic := s2sapi_{{$s2sapi.API.Version}}.New{{$s2sapi.API.ServiceName | ToGoName}}(log, metrics, 
+			config,
+			{{ if $save.PluginComponent.Spec.HasRelationalDatabase -}}
+    		dataService,
+			{{ end -}}
+			)
+			{{end}}
+		// Admin
+			{{range $adminapi :=.ExtInfo.APIOverview.Admin}}
+			{{$adminapi.BaseVarName}}Logic := adminapi_{{$adminapi.API.Version}}.New{{$adminapi.API.ServiceName | ToGoName}}(log, metrics, 
+			config,
+			{{ if $save.PluginComponent.Spec.HasRelationalDatabase -}}
+    		dataService,
+			{{ end -}}
+			)
+			{{end}}
+		// Public
+			{{range $publicapi :=.ExtInfo.APIOverview.Public}}
+			{{$publicapi.BaseVarName}}Logic := publicapi_{{$publicapi.API.Version}}.New{{$publicapi.API.ServiceName | ToGoName}}(log, metrics, 
+			config,
+			{{ if $save.PluginComponent.Spec.HasRelationalDatabase -}}
+    		dataService,
+			{{ end -}}
+			)
+			{{end}}
+
+		// create services
+		// region CODE_REGION(CREATE_SERVICES)
+		//Player
+			{{range $playerapi :=.ExtInfo.APIOverview.Player}}
+			{{$playerapi.BaseVarName}}Service := {{$playerapi.API.ServiceName}}_{{$playerapi.API.Version}}_player.NewPlayer{{$playerapi.API.ServiceName | ToGoName}}Service({{$playerapi.BaseVarName}}Logic, log,blaze.WithJSONEmitDefaults(true) )
+			{{end}}
+		// S2S
+			{{range $s2sapi :=.ExtInfo.APIOverview.S2S}}
+			{{$s2sapi.BaseVarName}}Service := {{$s2sapi.API.ServiceName}}_{{$s2sapi.API.Version}}_s2s.NewS2S{{$s2sapi.API.ServiceName | ToGoName}}Service({{$s2sapi.BaseVarName}}Logic, log,blaze.WithJSONEmitDefaults(true) )
+			{{end}}
+		// Admin
+			{{range $adminapi :=.ExtInfo.APIOverview.Admin}}
+			{{$adminapi.BaseVarName}}Service := {{$adminapi.API.ServiceName}}_{{$adminapi.API.Version}}_admin.NewAdmin{{$adminapi.API.ServiceName | ToGoName}}Service({{$adminapi.BaseVarName}}Logic, log,blaze.WithJSONEmitDefaults(true) )
+			{{end}}
+		// Public
+			{{range $publicapi :=.ExtInfo.APIOverview.Public}}
+			{{$publicapi.BaseVarName}}Service := {{$publicapi.API.ServiceName}}_{{$publicapi.API.Version}}_public.NewPublic{{$publicapi.API.ServiceName | ToGoName}}Service({{$publicapi.BaseVarName}}Logic, log,blaze.WithJSONEmitDefaults(true) )
+			{{end}}
+		// endregion
+	// create ServerMounts
+	// region CODE_REGION(CREATE_SERVERMOUNTS)
+		serverBuilders := []server.BlazeServerBuilder{}
+
+		var msb server.BlazeServerBuilder
+		if config.ProfilingEnabled {
+			msb = server.NewServerBuilder(fmt.Sprintf("%s:%s",adressPrefix, monitoringAPI.port),log, server.WithWriteTimeout(40*time.Second))
+			} else {
+				msb = server.NewServerBuilder(fmt.Sprintf("%s:%s",adressPrefix, monitoringAPI.port), log)
+			}
+		met := metrics.(management.MetricsProvider)
+		managementService := management.NewService(log, met, buildinfo, idProvider, ready, config.ProfilingEnabled, kestrelConfig)
+		msb.AddServerMount(server.NewBlazeServiceMount(managementService, "/", routePath+"/"+string(buildinfo.Name)))
+		serverBuilders = append(serverBuilders, msb)
+		{{ if .ExtInfo.APIOverview.HasPlayerAPI }}
+			psb := server.NewServerBuilder(fmt.Sprintf("%s:%s",adressPrefix, playerAPI.port), log)
+			psb.AddMiddleware(eos.Middleware(idProvider))
+			{{range $playerapi :=.ExtInfo.APIOverview.Player}}
+				psb.AddServerMount(server.NewBlazeServiceMount({{$playerapi.BaseVarName}}Service, "", routePath))
+			{{end}}
+			serverBuilders = append(serverBuilders, psb)
+		{{end}}
+		{{ if .ExtInfo.APIOverview.HasS2SAPI }}
+			ssb := server.NewServerBuilder(fmt.Sprintf("%s:%s",adressPrefix, s2sAPI.port), log)
+			{{range $s2sapi :=.ExtInfo.APIOverview.S2S}}
+				ssb.AddServerMount(server.NewBlazeServiceMount({{$s2sapi.BaseVarName}}Service, "", routePath))
+			{{end}}
+			serverBuilders = append(serverBuilders, ssb)
+		{{end}}
+		{{ if .ExtInfo.APIOverview.HasAdminAPI }}
+			asb := server.NewServerBuilder(fmt.Sprintf("%s:%s",adressPrefix, adminAPI.port), log)
+			{{range $adminapi :=.ExtInfo.APIOverview.Admin}}
+				asb.AddServerMount(server.NewBlazeServiceMount({{$adminapi.BaseVarName}}Service, "", routePath))
+			{{end}}
+			serverBuilders = append(serverBuilders, asb)
+		{{end}}
+		{{ if .ExtInfo.APIOverview.HasPublicAPI }}
+			pusb := server.NewServerBuilder(fmt.Sprintf("%s:%s",adressPrefix, publicAPI.port), log)
+			{{range $publicApi :=.ExtInfo.APIOverview.Public}}
+				pusb.AddServerMount(server.NewBlazeServiceMount({{$publicApi.BaseVarName}}Service, "", routePath))
+			{{end}}
+			serverBuilders = append(serverBuilders, pusb)
+		{{end}}
+	// endregion
+	// region CODE_REGION(MANAGEMENT_SERVICE)
+	// Add healthschecks in the form of: 
+	// managementService.AddWeakCheck(management.StatusRouteCheck("notification", httpc, time.Second*5, url.String()), /// 10*time.Second, 5*time.Second, false)
+	//	url, _ = s2sClient.GetURL("/status/wombat?checkStrongDependencies=true&checkWeakDependencies=false")
+// endregion
+// region CODE_REGION(SERVER_GROUP)
+
+	// create server group
+	inotifier := server.NewInterruptNotifier(log)
+	terminated := server.NewTerminatedNotifier()
+
+	bsg := server.NewServerGroupFromBuilders(inotifier, terminated, true, serverBuilders...)
+	msvc := []servicegroup.ManagedService{}
+// endregion
+	// add services here if needed
+// region CODE_REGION(MANAGED_SERVICES)
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+	msvc = append(msvc, servicegroup.NewManagedService(log, dataService, nil, nil))
+{{ end -}}
+// placeholder for future generation
+// endregion
+// region CODE_REGION(CREATE_FLOWCONTROL)
+	msg := servicegroup.NewManagedServiceGroup(terminated, nil, msvc...)
+	msg.Start()
+	bsg.Start()
+	bsg.Wait()
+	log.Info("All servers stopped")
+	msg.Wait()
+	log.Info("All services stopped")
+// endregion
+		return nil
+	}
+}

@@ -1,0 +1,5 @@
+{{ CodeSectionFileHeader | ToGoComment }}
+package mocks
+// region CODE_REGION(GEN)
+//go:generate moq -out metrics.go -pkg mocks ../metrics {{.PluginComponent.Spec.ToolName | ToGoName}}Metrics
+// endregion

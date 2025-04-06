@@ -1,0 +1,83 @@
+!!pathreplace PLAYERAPI playerapi_{{.APIDescriptor.API.Version}}
+!!if .APIDescriptor.IsPlayerAPI
+{{ CodeSectionFileHeader | ToGoComment }}
+package playerapi_{{.APIDescriptor.API.Version}} 
+
+import (
+	"context"
+	"github.com/go-logr/logr"
+	{{ if .APIDescriptor.IsV1 }}
+	"{{.APIDescriptor.API.GoModule}}/{{.APIDescriptor.API.Version}}/go/{{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_common"
+	"{{.APIDescriptor.API.GoModule}}/{{.APIDescriptor.API.Version}}/go/{{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_player"
+	{{else}}
+	"{{.APIDescriptor.API.GoModule}}/go/{{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_common"
+	"{{.APIDescriptor.API.GoModule}}/go/{{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_player"
+	{{end}}
+	"{{.GoModule}}/internal/pkg/app"
+	"{{.GoModule}}/internal/pkg/metrics"
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+    "{{.GoModule}}/internal/pkg/data"
+{{ end -}}
+
+	"code.cestus.io/libs/gotools/pkg/authorizer"
+	"code.cestus.io/libs/gotools/pkg/httpwares/eos"
+	"code.cestus.io/libs/gotypes/pkg/types"
+) 
+
+// region CODE_REGION(API_STRUCT)
+type playerapi_{{.APIDescriptor.API.Version | ToGoPackageName}} struct {
+	log               logr.Logger
+	config            app.Config
+	metrics           metrics.{{.PluginComponent.Spec.ToolName | ToGoName}}Metrics
+	authorizerConfig  authorizer.Config
+	idProvider        types.IDProvider
+	timeProvider      types.TimeProvider
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+    dataService *data.Service
+{{ end -}}
+// endregion
+}
+
+// region CODE_REGION(API_NEW)
+//New{{.APIDescriptor.API.ServiceName | ToGoName}} creates a new playerapi implementation
+func New{{.APIDescriptor.API.ServiceName | ToGoName}}(
+	log logr.Logger,
+	metrics metrics.{{.PluginComponent.Spec.ToolName | ToGoName}}Metrics,
+	config app.Config,
+	authorizerConfig authorizer.Config,
+	idProvider types.IDProvider,
+	timeProvider types.TimeProvider,
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+    dataService *data.Service,
+{{ end -}}
+//endregion
+) {{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_player.Player{{.APIDescriptor.API.ServiceName | ToGoName}} {
+	// region CODE_REGION(API_IMPLEMENT)
+	return &playerapi_{{.APIDescriptor.API.Version | ToGoPackageName}}{
+		log:               log,
+		metrics:           metrics,
+		config:            config,
+		authorizerConfig: authorizerConfig,
+		idProvider:       idProvider,
+		timeProvider:     timeProvider,
+{{ if .PluginComponent.Spec.HasRelationalDatabase -}}
+        dataService: dataService,
+{{ end -}}
+	// endregion
+	}
+}
+
+//Echo implemements Echo from {{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_player.Player{{.APIDescriptor.API.ServiceName | ToGoName}}
+func (api *playerapi_{{.APIDescriptor.API.Version | ToGoPackageName}}) Echo(ctx context.Context, in *{{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_common.EchoMessage) (*{{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_common.EchoMessage, error) {
+	// Authorizer sample
+	// var playerID types.PlayerID
+	// err := api.idProvider.FromString(&playerID, in.PlayerID)
+	// if err != nil {
+	// 	return &&{{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_common.EchoMessage{}, err
+	// }
+	// err = authorizer.AuthorizeWith(ctx, api.authorizerConfig, eos.EOSTokenPlayerIDAuthorizer(playerID))
+	// if err != nil {
+	// 	return &&{{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_common.EchoMessage{}, err
+	// }
+	return &{{.APIDescriptor.API.ServiceName | ToGoPackageName}}_{{.APIDescriptor.API.Version}}_common.EchoMessage{Content: in.Content}, nil
+}

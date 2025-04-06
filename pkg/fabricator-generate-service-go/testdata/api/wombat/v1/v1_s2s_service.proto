@@ -1,0 +1,13 @@
+
+syntax = "proto3";
+
+package wombat.v1;
+option go_package = "example.com/api/wombat/v1/go/wombat_v1_s2s";
+
+import "v1_common.proto";
+
+// S2SWombat is a S2S Wombat
+service S2SWombat {
+     rpc Echo(EchoMessage) returns (EchoMessage);
+}
+

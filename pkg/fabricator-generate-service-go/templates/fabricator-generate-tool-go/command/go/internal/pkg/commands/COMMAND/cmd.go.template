@@ -1,0 +1,40 @@
+!!if (not .ExtInfo.IsServeCmd)  (not .ExtInfo.IsMigrateCmd)
+!!pathreplace COMMAND {{.Command.Name}}cmd
+{{ CodeSectionFileHeader | ToGoComment }}
+package {{.Command.Name | ToGoPackageName}}cmd
+
+import (
+// region CODE_REGION(COMMON_IMPORTS)
+	"context"
+	"github.com/peterbourgon/ff/v4"
+//endregion
+
+)
+
+// region CODE_REGION(IMPLEMENT)
+type RunFunc func(ctx context.Context, args []string) error
+
+// New returns a  ff.Command for the version subcommand.
+func New(conf *{{.Command.Name | ToGoPackageName}}cfg.Config, run RunFunc) *ff.Command {
+	return &ff.Command{
+		Name:       "{{.Command.Name | ToLower}}",
+		Usage: "{{.PluginComponent.Spec.ToolName | ToLower}} {{.Command.Name | ToLower}} [flags] ",
+		ShortHelp:  "{{.Command.Name | ToLower}}",
+		Flags:    conf.FS,
+		Exec:       run,
+//endregion
+	}
+}
+
+
+// region CODE_REGION(COMMON_RUNFUNC)
+func ProvideRunFunc(
+	conf *{{.Command.Name | ToGoPackageName}}cfg.Config,
+//endregion
+// region CODE_REGION(COMMON_RUNFUNCPART2)
+) RunFunc {
+	return func(ctx context.Context, args []string) error {
+		//endregion
+		return nil
+	}
+}

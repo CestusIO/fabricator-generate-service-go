@@ -1,0 +1,27 @@
+!!if .PluginComponent.Spec.HasRelationalDatabase
+{{ CodeSectionFileHeader | ToGoComment }}
+package data
+
+// region CODE_REGION(COMMON_IMPORT)
+import (
+	"embed"
+	"io/fs"
+// enregion
+)
+// region CODE_REGION(COMMON_SQL)
+//go:embed migrations/sql
+var embededSqlMigrations embed.FS
+
+func GetSqlMigrations() (fs.ReadDirFS, error) {
+	sub, err := fs.Sub(embededSqlMigrations, "migrations/sql")
+    if err != nil {
+        return nil, err // Return nil and the error if unable to create the subdirectory FS
+    }
+
+    readDirFS, ok := sub.(fs.ReadDirFS)
+    if !ok {
+        return nil, fs.ErrInvalid 
+    }
+    return readDirFS, nil
+}
+// endregion

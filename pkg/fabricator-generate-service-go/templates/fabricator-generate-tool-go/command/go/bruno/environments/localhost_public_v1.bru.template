@@ -1,0 +1,6 @@
+!!if .ExtInfo.APIOverview.HasPublicAPI
+!!delimiters <<< >>>
+vars {
+  baseUrl: http://localhost:8004/<<<.PluginComponent.Spec.ToolName | ToLower>>>/v1/public
+  token: {{process.env.EMPTY_TOKEN}}
+}
